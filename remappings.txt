@@ -1,3 +1,4 @@
 openzeppelin/=./lib/openzeppelin-contracts/contracts/
+erc721a/=./lib/ERC721A/contracts/
 @core=./contracts/core
 @modules=./contracts/modules/

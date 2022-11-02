@@ -7,7 +7,6 @@ import {IMinterModule} from "@modules/interfaces/IMinterModule.sol";
 import {ISoundFeeRegistry} from "@modules/interfaces/ISoundFeeRegistry.sol";
 import {IERC165} from "openzeppelin/utils/introspection/IERC165.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
-import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 
 /**
  * @title Minter Base
@@ -414,33 +413,6 @@ abstract contract BaseMinter is IMinterModule {
             // Deduct the platform fee.
             // Won't underflow as `platformFee <= requiredEtherValue`;
             remainingPayment = requiredEtherValue - platformFee;
-        }
-    }
-
-    /**
-     * @dev Increments `totalMinted` with `quantity`, reverting if `totalMinted + quantity > maxMintable`.
-     * @param totalMinted The current total number of minted tokens.
-     * @param maxMintable The maximum number of mintable tokens.
-     * @return `totalMinted` + `quantity`.
-     */
-    function _incrementTotalMinted(
-        uint32 totalMinted,
-        uint32 quantity,
-        uint32 maxMintable
-    ) internal pure returns (uint32) {
-        unchecked {
-            // Won't overflow as both are 32 bits.
-            uint256 sum = uint256(totalMinted) + uint256(quantity);
-            if (sum > maxMintable) {
-                // Note that the `maxMintable` may vary and drop over time
-                // and cause `totalMinted` to be greater than `maxMintable`.
-                // The `zeroFloorSub` is equivalent to `max(0, x - y)`.
-                uint32 available = uint32(
-                    FixedPointMathLib.zeroFloorSub(maxMintable, totalMinted)
-                );
-                revert ExceedsAvailableSupply(available);
-            }
-            return uint32(sum);
         }
     }
 }
