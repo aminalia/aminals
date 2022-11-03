@@ -2,7 +2,7 @@
 pragma solidity ^0.8.16;
 
 import {Ownable} from "openzeppelin/access/Ownable.sol";
-import {ISoundEditionV1} from "@core/interfaces/ISoundEditionV1.sol";
+import {IAccessories} from "@core/interfaces/IAccessories.sol";
 import {IMinterModule} from "@modules/interfaces/IMinterModule.sol";
 import {ISoundFeeRegistry} from "@modules/interfaces/ISoundFeeRegistry.sol";
 import {IERC165} from "openzeppelin/utils/introspection/IERC165.sol";
@@ -226,7 +226,7 @@ abstract contract BaseMinter is IMinterModule {
             msg.sender != Ownable(edition).owner() &&
             !OwnableRoles(edition).hasAnyRole(
                 msg.sender,
-                ISoundEditionV1(edition).ADMIN_ROLE()
+                IAccessories(edition).ADMIN_ROLE()
             )
         ) revert Unauthorized();
 
@@ -367,7 +367,7 @@ abstract contract BaseMinter is IMinterModule {
             msg.sender,
             // Need to put this call here to avoid stack-too-deep error (it returns fromTokenId)
             uint32(
-                ISoundEditionV1(edition).mint{value: remainingPayment}(
+                IAccessories(edition).mint{value: remainingPayment}(
                     msg.sender,
                     quantity
                 )

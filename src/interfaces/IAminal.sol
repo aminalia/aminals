@@ -1,6 +1,48 @@
 pragma solidity ^0.8.16;
 
-interface IAminal {
-  
-    function mint(address to, uint256 quantity) external payable returns (uint256 fromTokenId);
+import "openzeppelin/token/ERC721/IERC721.sol";
+
+interface IAminal is IERC721 {
+    error AminalDoesNotExist();
+    error SenderDoesNotHaveMaxAffinity();
+    error ExceedsMaxLocation();
+    error OnlyMoveWithGoTo();
+    error MaxAminalsSpawned();
+
+    event AminalSpawned(
+        address spawner,
+        uint256 aminalId,
+        uint256 value,
+        uint256 affinity
+    );
+
+    event AminalFed(
+        address feeder,
+        uint256 aminalId,
+        uint256 value,
+        uint256 newAffinity,
+        bool newMax
+    );
+
+    function locationOf(uint256 aminalId)
+        external
+        view
+        returns (uint160 location);
+
+    function addressOf(uint256 aminalId)
+        external
+        view
+        returns (address aminalAddress);
+
+    function spawn() external payable;
+
+    function feed(uint256 aminalId) external payable;
+
+    function goTo(uint256 aminalId, uint160 location) external;
+
+    function affinity(uint256, address) external view returns (uint256);
+
+    function maxAffinity(uint256) external view returns (uint256);
+    
+    function equip(address, uint256) external;
 }

@@ -2,14 +2,10 @@
 pragma solidity ^0.8.16;
 
 import "openzeppelin/token/ERC721/ERC721.sol";
+import "@core/interfaces/IAminal.sol";
 
-error AminalDoesNotExist();
-error SenderDoesNotHaveMaxAffinity();
-error ExceedsMaxLocation();
-error OnlyMoveWithGoTo();
-error MaxAminalsSpawned();
 
-contract Aminal is ERC721 {
+contract Aminal is ERC721, IAminal {
     constructor() ERC721("Aminal", "AMNL") {}
 
     uint160 constant MAX_LOCATION = 1e9;
@@ -18,28 +14,13 @@ contract Aminal is ERC721 {
 
     uint256 currentAminalId;
 
-    bool going;
+    bool private going;
 
     modifier goingTo() {
         going = true;
         _;
         going = false;
     }
-
-    event AminalSpawned(
-        address spawner,
-        uint256 aminalId,
-        uint256 value,
-        uint256 affinity
-    );
-
-    event AminalFed(
-        address feeder,
-        uint256 aminalId,
-        uint256 value,
-        uint256 newAffinity,
-        bool newMax
-    );
 
     mapping(uint256 => mapping(address => uint256)) public affinity;
     mapping(uint256 => uint256) public maxAffinity;
@@ -59,7 +40,9 @@ contract Aminal is ERC721 {
         returns (address aminalAddress)
     {
         aminalAddress = address(
-            uint160(uint256(keccak256(abi.encodePacked(address(this), aminalId))))
+            uint160(
+                uint256(keccak256(abi.encodePacked(address(this), aminalId)))
+            )
         );
     }
 
