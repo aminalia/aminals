@@ -27,11 +27,6 @@ interface IAminal is IERC721 {
     
     function exists(uint256 aminalId) external view returns (bool);
 
-    function locationOf(uint256 aminalId)
-        external
-        view
-        returns (uint160 location);
-
     function addressOf(uint256 aminalId)
         external
         view

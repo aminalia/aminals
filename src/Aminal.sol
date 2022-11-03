@@ -4,17 +4,17 @@ pragma solidity ^0.8.16;
 import "openzeppelin/token/ERC721/ERC721.sol";
 import "@core/interfaces/IAminal.sol";
 import "@core/interfaces/IAccessories.sol";
+import "@core/interfaces/IAminalCoordinates.sol";
 
 contract Aminal is ERC721, IAminal {
-    constructor() ERC721("Aminal", "AMNL") {}
-
-    uint160 constant MAX_LOCATION = 1e9;
 
     uint256 constant MAX_AMINALS = 1e4;
 
     uint256 currentAminalId;
 
     bool private going;
+    
+    IAminalCoordinates public coordinates;
 
     modifier goingTo() {
         going = true;
@@ -33,14 +33,10 @@ contract Aminal is ERC721, IAminal {
 
     mapping(uint256 => mapping(address => Accessory)) public accessories;
 
-    function locationOf(uint256 aminalId)
-        public
-        view
-        returns (uint160 location)
-    {
-        if (!_exists(aminalId)) revert AminalDoesNotExist();
-        return uint160(ownerOf(aminalId));
+    constructor(address _coordinatesMap) ERC721("Aminal", "AMNL") {
+        coordinates = IAminalCoordinates(_coordinatesMap);
     }
+
 
     function addressOf(uint256 aminalId)
         public
@@ -73,7 +69,7 @@ contract Aminal is ERC721, IAminal {
                 abi.encodePacked(blockhash(block.number - 1), currentAminalId)
             )
         );
-        address location = address(uint160(pseudorandomness % MAX_LOCATION));
+        address location = address(uint160(pseudorandomness % coordinates.maxLocation()));
         _mint(location, currentAminalId);
 
         emit AminalSpawned(
@@ -104,7 +100,7 @@ contract Aminal is ERC721, IAminal {
         if (!_exists(aminalId)) revert AminalDoesNotExist();
         if (affinity[aminalId][msg.sender] != maxAffinity[aminalId])
             revert SenderDoesNotHaveMaxAffinity();
-        if (location > MAX_LOCATION) revert ExceedsMaxLocation();
+        if (location > coordinates.maxLocation()) revert ExceedsMaxLocation();
 
         _transfer(ownerOf(aminalId), address(location), aminalId);
     }
