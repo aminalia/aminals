@@ -1,5 +1,5 @@
 openzeppelin/=./lib/openzeppelin-contracts/contracts/
 erc721a/=./lib/ERC721A/contracts/
-@core=./contracts
-@modules=./contracts/modules/
+@core=./src/
+@modules=./src/modules/
 solady/=./lib/solady/src/

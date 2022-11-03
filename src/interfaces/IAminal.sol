@@ -8,6 +8,7 @@ interface IAminal is IERC721 {
     error ExceedsMaxLocation();
     error OnlyMoveWithGoTo();
     error MaxAminalsSpawned();
+    error OnlyEquipOwnedAccessory();
 
     event AminalSpawned(
         address spawner,
@@ -44,5 +45,7 @@ interface IAminal is IERC721 {
 
     function maxAffinity(uint256) external view returns (uint256);
     
-    function equip(address, uint256) external;
+    function equip(uint256 aminalId, address accessory, uint256 accessoryId) external;
+
+    function unequip(uint256 aminalId, address accessory, uint256 accessoryId) external;
 }

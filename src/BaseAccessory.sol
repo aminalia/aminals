@@ -2,7 +2,7 @@
 pragma solidity ^0.8.16;
 
 import {Ownable} from "openzeppelin/access/Ownable.sol";
-import {IAccessories} from "@core/interfaces/IAccessories.sol";
+import {IAccessories, IERC721A} from "@core/interfaces/IAccessories.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {ERC721A} from "erc721a/ERC721A.sol";
 import {IAminal} from "@core/interfaces/IAminal.sol";
@@ -42,14 +42,14 @@ contract BaseAccessory is IAccessories, Ownable, ERC721A {
         string calldata symbol_,
         address _aminalAddress,
         address _fundingRecipient,
-        uint256 supply
+        uint32 supply
     ) public {
         if (initialized) revert AlreadyInitialized();
         initialized = true;
         _name = name_;
         _symbol = symbol_;
         aminalAddress = _aminalAddress;
-        maxAccessories = supply;
+        maxSupply = supply;
         fundingRecipient = _fundingRecipient;
     }
 
@@ -82,14 +82,25 @@ contract BaseAccessory is IAccessories, Ownable, ERC721A {
         emit MinterSet(newMinter);
     }
 
+    function mint(address to, uint256 quantity)
+        external
+        payable
+        returns (uint256 fromTokenId)
+    {
+        if (msg.sender != minter) revert OnlyMinterCanMint();
+        fromTokenId = _nextTokenId();
+        // Mint the tokens. Will revert if `quantity` is zero.
+        _mint(to, quantity);
+    }
+
     // =============================================================
     //               PUBLIC / EXTERNAL VIEW FUNCTIONS
     // =============================================================
-    function name() public view override returns (string memory) {
+    function name() public view override(ERC721A, IERC721A) returns (string memory) {
         return _name;
     }
 
-    function symbol() public view override returns (string memory) {
+    function symbol() public view override(ERC721A, IERC721A) returns (string memory) {
         return _symbol;
     }
 
@@ -105,7 +116,7 @@ contract BaseAccessory is IAccessories, Ownable, ERC721A {
         public
         view
         virtual
-        override(IAccessories, ERC721A, IERC721A)
+        override(IAccessories, ERC721A)
         returns (bool)
     {
         return

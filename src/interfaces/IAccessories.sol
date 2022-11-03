@@ -1,6 +1,6 @@
 pragma solidity ^0.8.16;
 
-import {IERC721A} from "chiru-labs/ERC721A/IERC721A.sol";
+import {IERC721A} from "erc721a/IERC721A.sol";
 import {IERC165} from "openzeppelin/utils/introspection/IERC165.sol";
 
 interface IAccessories is IERC721A {
@@ -8,6 +8,10 @@ interface IAccessories is IERC721A {
     event ContractURISet(string contractURI);
     event MinterSet(address newMinter);
     event FundingRecipientSet(address fundingRecipient);
+
+    error AlreadyInitialized();
+    error OnlyMinterCanMint();
+    error InvalidFundingRecipient();
 
     function mint(address to, uint256 quantity)
         external
@@ -65,6 +69,6 @@ interface IAccessories is IERC721A {
     function supportsInterface(bytes4 interfaceId)
         external
         view
-        override(IERC721A, IERC165)
+        override(IERC721A)
         returns (bool);
 }

@@ -3,7 +3,7 @@ pragma solidity ^0.8.16;
 
 import "openzeppelin/token/ERC721/ERC721.sol";
 import "@core/interfaces/IAminal.sol";
-
+import "@core/interfaces/IAccessories.sol";
 
 contract Aminal is ERC721, IAminal {
     constructor() ERC721("Aminal", "AMNL") {}
@@ -22,8 +22,16 @@ contract Aminal is ERC721, IAminal {
         going = false;
     }
 
+    struct Accessory {
+        address accessoryContract;
+        uint256 accessoryId;
+        bool equipped;
+    }
+
     mapping(uint256 => mapping(address => uint256)) public affinity;
     mapping(uint256 => uint256) public maxAffinity;
+
+    mapping(uint256 => mapping(address => Accessory)) public accessories;
 
     function locationOf(uint256 aminalId)
         public
@@ -97,6 +105,42 @@ contract Aminal is ERC721, IAminal {
         _transfer(ownerOf(aminalId), address(location), aminalId);
     }
 
+    function equip(
+        uint256 aminalId,
+        address accessory,
+        uint256 accessoryId
+    ) external {
+        if (!_exists(aminalId)) revert AminalDoesNotExist();
+        if (affinity[aminalId][msg.sender] != maxAffinity[aminalId])
+            revert SenderDoesNotHaveMaxAffinity();
+        if (IAccessories(accessory).ownerOf(accessoryId) != addressOf(aminalId))
+            revert OnlyEquipOwnedAccessory();
+
+        accessories[aminalId][accessory] = Accessory(
+            accessory,
+            accessoryId,
+            true
+        );
+    }
+
+    function unequip(
+        uint256 aminalId,
+        address accessory,
+        uint256 accessoryId
+    ) external {
+        if (!_exists(aminalId)) revert AminalDoesNotExist();
+        if (affinity[aminalId][msg.sender] != maxAffinity[aminalId])
+            revert SenderDoesNotHaveMaxAffinity();
+        if (IAccessories(accessory).ownerOf(accessoryId) != addressOf(aminalId))
+            revert OnlyEquipOwnedAccessory();
+
+        accessories[aminalId][accessory] = Accessory(
+            accessory,
+            accessoryId,
+            false
+        );
+    }
+
     function updateAffinity(
         uint256 aminalId,
         address sender,
@@ -112,7 +156,7 @@ contract Aminal is ERC721, IAminal {
         address,
         address,
         uint256
-    ) internal view override(ERC721) {
+    ) internal view {
         if (!going) revert OnlyMoveWithGoTo();
     }
 }
