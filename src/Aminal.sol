@@ -54,6 +54,10 @@ contract Aminal is ERC721, IAminal {
         );
     }
 
+    function exists(uint256 aminalId) public view returns (bool) {
+        return _exists(aminalId);
+    }
+
     function spawn() public payable {
         // TODO require nonzero value?
         if (currentAminalId == MAX_AMINALS) revert MaxAminalsSpawned();
