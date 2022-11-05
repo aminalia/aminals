@@ -18,8 +18,10 @@ error MaxAminalsSpawned();
 
 // TODO: Refactor Aminals to structs
 // TODO: Add getters for prices for each action
-// TODO: Add hunger
+// TODO: Add hunger. Hunger acts as a multiplier on top of the units of food
+// that someone bought
 // TODO: Add poop
+// TODO: Add bulk purchase of food and movement
 // TODO: Add function that lets us modify metadata for unissued NFTs (and not
 // for issued ones)
 contract Aminal is ERC721, IAminal {
