@@ -1,4 +1,5 @@
 openzeppelin/=./lib/openzeppelin-contracts/contracts/
 solady/=./lib/solady/src/
+solmate/=lib/solmate-v6/src/
 @core=./src/
 @modules=./src/modules/
