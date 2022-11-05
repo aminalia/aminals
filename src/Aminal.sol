@@ -1,19 +1,39 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.17;
 
 import "openzeppelin/token/ERC721/ERC721.sol";
 import "@core/interfaces/IAminal.sol";
 import "@core/interfaces/IAccessories.sol";
 import "@core/interfaces/IAminalCoordinates.sol";
 
+import "./AminalVRGDA.sol";
+
+import "../lib/solmate/src/utils/SafeTransferLib.sol";
+
+error AminalDoesNotExist();
+error PriceTooLow();
+error SenderDoesNotHaveMaxAffinity();
+error ExceedsMaxLocation();
+error OnlyMoveWithGoTo();
+error MaxAminalsSpawned();
+
+// TODO: Refactor Aminals to structs
+// TODO: Add getters for prices for each action
+// TODO: Add hunger
+// TODO: Add poop
+// TODO: Add function that lets us modify metadata for unissued NFTs (and not
+// for issued ones)
 contract Aminal is ERC721, IAminal {
+    // Use SafeTransferLib from Solmate V7, which is identical to the
+    // SafeTransferLib from Solmate V6 besides the MIT license
+    uint160 constant MAX_LOCATION = 1e9;
 
     uint256 constant MAX_AMINALS = 1e4;
 
     uint256 currentAminalId;
 
     bool private going;
-    
+
     IAminalCoordinates public coordinates;
 
     modifier goingTo() {
@@ -30,13 +50,55 @@ contract Aminal is ERC721, IAminal {
 
     mapping(uint256 => mapping(address => uint256)) public affinity;
     mapping(uint256 => uint256) public maxAffinity;
+    // Spawning aminals has a global curve, while every other VRGDA is a local
+    // curve. This is because we don't have per-aminal spawns. Breeding aminals,
+    // for example, would have a local curve.
+    AminalVRGDA spawnVRGDA;
+    // Set up a mapping of VRGDAs per aminal
+    // Each aminal has its own VRGDA curve, to represent its individual
+    // level of attention
+    mapping(uint256 => AminalVRGDA) feedVRGDA;
+    mapping(uint256 => AminalVRGDA) goToVRGDA;
+
+    // TODO: Update this with the timestamp of deployment. This will save gas by
+    // maintaing it as a constant instead of setting it in the constructor.
+    int256 constant TIME_SINCE_START = 0;
+
+    // TODO: Update these values to more thoughtful ones
+    // A spawn costs 0.01 ETH with a 10% price increase or decrease and an expected spawn rate of two per day
+    int256 spawnTargetPrice = 0.01e18;
+    int256 spawnPriceDecayPercent = 0.1e18;
+    int256 spawnPerTimeUnit = 2e18;
+
+    // A feeding costs 0.001 ETH with a 5% price increase or decrease and an expected feed rate of 4 per hour, i.e. 4 * 24 = 96 over 24 hours
+    int256 feedTargetPrice = 0.001e18;
+    int256 feedPriceDecayPercent = 0.05e18;
+    int256 feedPerTimeUnit = 96e18;
+
+    // A goto costs 0.001 ETH with a 10% price increase or decrease and an expected goto rate of 4 per hour, i.e. 4 * 24 = 96 over 24 hours
+    int256 goToTargetPrice = 0.001e18;
+    int256 goToPriceDecayPercent = 0.1e18;
+    int256 goToPerTimeUnit = 96e18;
+
+    enum ActionTypes {
+        SPAWN,
+        FEED,
+        GO_TO
+    }
+
+    constructor() ERC721("Aminal", "AMNL") {
+        spawnVRGDA = new AminalVRGDA(
+            spawnTargetPrice,
+            spawnPriceDecayPercent,
+            spawnPerTimeUnit
+        );
+    }
 
     mapping(uint256 => mapping(address => Accessory)) public accessories;
 
     constructor(address _coordinatesMap) ERC721("Aminal", "AMNL") {
         coordinates = IAminalCoordinates(_coordinatesMap);
     }
-
 
     function addressOf(uint256 aminalId)
         public
@@ -55,8 +117,16 @@ contract Aminal is ERC721, IAminal {
     }
 
     function spawn() public payable {
-        // TODO require nonzero value?
         if (currentAminalId == MAX_AMINALS) revert MaxAminalsSpawned();
+        // TODO: Refactor this to overload the checkVRGDAInitialized function to
+        // only require an action for spawn (no aminalId needed)
+        checkVRGDAInitialized(currentAminalId, ActionTypes.SPAWN);
+        uint256 price = spawnVRGDA.getVRGDAPrice(
+            TIME_SINCE_START,
+            currentAminalId
+        );
+        bool excessPrice = checkExcessPrice(price);
+
         currentAminalId++;
         uint256 senderAffinity = updateAffinity(
             currentAminalId,
@@ -69,8 +139,14 @@ contract Aminal is ERC721, IAminal {
                 abi.encodePacked(blockhash(block.number - 1), currentAminalId)
             )
         );
-        address location = address(uint160(pseudorandomness % coordinates.maxLocation()));
+        address location = address(
+            uint160(pseudorandomness % coordinates.maxLocation())
+        );
         _mint(location, currentAminalId);
+
+        if (excessPrice) {
+            refundExcessPrice(price);
+        }
 
         emit AminalSpawned(
             msg.sender,
@@ -81,6 +157,14 @@ contract Aminal is ERC721, IAminal {
     }
 
     function feed(uint256 aminalId) public payable {
+        checkVRGDAInitialized(aminalId, ActionTypes.FEED);
+        uint256 price = spawnVRGDA.getVRGDAPrice(
+            TIME_SINCE_START,
+            // TODO: Refactor this to use the total food (requires the struct refactor)
+            currentAminalId
+        );
+        bool excessPrice = checkExcessPrice(price);
+
         uint256 senderAffinity = updateAffinity(
             aminalId,
             msg.sender,
@@ -91,6 +175,10 @@ contract Aminal is ERC721, IAminal {
         if (senderAffinity > maxAffinity[aminalId]) {
             maxAffinity[aminalId] = senderAffinity;
             newMax = true;
+        }
+
+        if (excessPrice) {
+            refundExcessPrice(price);
         }
 
         emit AminalFed(msg.sender, aminalId, msg.value, senderAffinity, newMax);
@@ -151,7 +239,78 @@ contract Aminal is ERC721, IAminal {
         senderAffinity = affinity[aminalId][sender];
     }
 
+    function checkVRGDAInitialized(uint256 aminalId, ActionTypes action)
+        internal
+    {
+        AminalVRGDA vrgda;
+
+        if (action != ActionTypes.SPAWN) {
+            vrgda = getVRGDAForNonSpawnAction(action, aminalId);
+        } else {
+            vrgda = spawnVRGDA;
+        }
+
+        if (!vrgda.isInitialized()) {
+            initializeVRGDA(aminalId, action);
+        }
+    }
+
+    function initializeVRGDA(uint256 aminalId, ActionTypes action) internal {
+        AminalVRGDA vrgda;
+        if (action == ActionTypes.SPAWN) {
+            vrgda = new AminalVRGDA(
+                spawnTargetPrice,
+                spawnPriceDecayPercent,
+                spawnPerTimeUnit
+            );
+        } else if (action == ActionTypes.FEED) {
+            vrgda = new AminalVRGDA(
+                feedTargetPrice,
+                feedPriceDecayPercent,
+                feedPerTimeUnit
+            );
+        } else if (action == ActionTypes.GO_TO) {
+            vrgda = new AminalVRGDA(
+                goToTargetPrice,
+                goToPriceDecayPercent,
+                goToPerTimeUnit
+            );
+        }
+    }
+
+    function getVRGDAForNonSpawnAction(ActionTypes action, uint256 aminalId)
+        internal
+        returns (AminalVRGDA)
+    {
+        if (action == ActionTypes.FEED) {
+            return feedVRGDA[aminalId];
+        } else if (action == ActionTypes.GO_TO) {
+            return goToVRGDA[aminalId];
+        }
+    }
+
+    // This takes care of users who have sent too much ETH between seeing a
+    // transaction and confirming a transaction.
+    // Returns true if there is excess, false if the price is exact, and reverts
+    // if the price is too low We cannot refund here because refunding here
+    // would open up a re-entrancy attack. We need to refund at the end of the
+    // function.
+    function checkExcessPrice(uint256 price) internal returns (bool) {
+        if (msg.value > price) {
+            return true;
+        } else if (msg.value < price) {
+            revert PriceTooLow();
+        } else {
+            return false;
+        }
+    }
+
+    function refundExcessPrice(uint256 price) internal {
+        SafeTransferLib.safeTransferETH(msg.sender, msg.value - price);
+    }
+
     // Protect against someone mining the location key by disallowing any tranfser besides goto
+    // TODO: Fix override. The current override does not compile
     function _beforeTokenTransfer(
         address,
         address,

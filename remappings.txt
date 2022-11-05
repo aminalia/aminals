@@ -1,5 +1,6 @@
 openzeppelin/=./lib/openzeppelin-contracts/contracts/
 erc721a/=./lib/ERC721A/contracts/
+solady/=./lib/solady/src/
+solmate/=lib/solmate-v6/src/
 @core=./src/
 @modules=./src/modules/
-solady/=./lib/solady/src/
