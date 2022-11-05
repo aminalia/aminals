@@ -43,6 +43,22 @@ contract Aminal is ERC721, IAminal {
         going = false;
     }
 
+    struct Aminal {
+        address favorite;
+        address coordinates;
+        uint256 totalFed;
+        uint256 totalGoTo;
+        // We can calculate hunger based on lastFed.
+        uint256 lastFed;
+        uint256 lastGoTo;
+        uint256 timeSpawned;
+        uint256 lastPooped;
+        // We don't need to track the highest fed or goto amount because we can
+        // get that by quering the mappings for the favorite address
+        mapping(address => uint256) fedPerAddress;
+        mapping(address => uint256) gotoPerAddress;
+    }
+
     mapping(uint256 => mapping(address => uint256)) public affinity;
     mapping(uint256 => uint256) public maxAffinity;
     // Spawning aminals has a global curve, while every other VRGDA is a local
