@@ -79,16 +79,13 @@ contract Aminal is ERC721, IAminal {
         GO_TO
     }
 
-    constructor() ERC721("Aminal", "AMNL") {
+    constructor(address _coordinatesMap) ERC721("Aminal", "AMNL") {
+        coordinates = IAminalCoordinates(_coordinatesMap);
         spawnVRGDA = new AminalVRGDA(
             spawnTargetPrice,
             spawnPriceDecayPercent,
             spawnPerTimeUnit
         );
-    }
-
-    constructor(address _coordinatesMap) ERC721("Aminal", "AMNL") {
-        coordinates = IAminalCoordinates(_coordinatesMap);
     }
 
     function addressOf(uint256 aminalId)
