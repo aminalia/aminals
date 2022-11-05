@@ -3,7 +3,6 @@ pragma solidity ^0.8.17;
 
 import "openzeppelin/token/ERC721/ERC721.sol";
 import "@core/interfaces/IAminal.sol";
-import "@core/interfaces/IAccessories.sol";
 import "@core/interfaces/IAminalCoordinates.sol";
 
 import "./AminalVRGDA.sol";
@@ -40,12 +39,6 @@ contract Aminal is ERC721, IAminal {
         going = true;
         _;
         going = false;
-    }
-
-    struct Accessory {
-        address accessoryContract;
-        uint256 accessoryId;
-        bool equipped;
     }
 
     mapping(uint256 => mapping(address => uint256)) public affinity;
@@ -93,8 +86,6 @@ contract Aminal is ERC721, IAminal {
             spawnPerTimeUnit
         );
     }
-
-    mapping(uint256 => mapping(address => Accessory)) public accessories;
 
     constructor(address _coordinatesMap) ERC721("Aminal", "AMNL") {
         coordinates = IAminalCoordinates(_coordinatesMap);
@@ -191,42 +182,6 @@ contract Aminal is ERC721, IAminal {
         if (location > coordinates.maxLocation()) revert ExceedsMaxLocation();
 
         _transfer(ownerOf(aminalId), address(location), aminalId);
-    }
-
-    function equip(
-        uint256 aminalId,
-        address accessory,
-        uint256 accessoryId
-    ) external {
-        if (!_exists(aminalId)) revert AminalDoesNotExist();
-        if (affinity[aminalId][msg.sender] != maxAffinity[aminalId])
-            revert SenderDoesNotHaveMaxAffinity();
-        if (IAccessories(accessory).ownerOf(accessoryId) != addressOf(aminalId))
-            revert OnlyEquipOwnedAccessory();
-
-        accessories[aminalId][accessory] = Accessory(
-            accessory,
-            accessoryId,
-            true
-        );
-    }
-
-    function unequip(
-        uint256 aminalId,
-        address accessory,
-        uint256 accessoryId
-    ) external {
-        if (!_exists(aminalId)) revert AminalDoesNotExist();
-        if (affinity[aminalId][msg.sender] != maxAffinity[aminalId])
-            revert SenderDoesNotHaveMaxAffinity();
-        if (IAccessories(accessory).ownerOf(accessoryId) != addressOf(aminalId))
-            revert OnlyEquipOwnedAccessory();
-
-        accessories[aminalId][accessory] = Accessory(
-            accessory,
-            accessoryId,
-            false
-        );
     }
 
     function updateAffinity(

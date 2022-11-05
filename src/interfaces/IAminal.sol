@@ -24,7 +24,7 @@ interface IAminal is IERC721 {
         uint256 newAffinity,
         bool newMax
     );
-    
+
     function exists(uint256 aminalId) external view returns (bool);
 
     function addressOf(uint256 aminalId)
@@ -41,8 +41,4 @@ interface IAminal is IERC721 {
     function affinity(uint256, address) external view returns (uint256);
 
     function maxAffinity(uint256) external view returns (uint256);
-    
-    function equip(uint256 aminalId, address accessory, uint256 accessoryId) external;
-
-    function unequip(uint256 aminalId, address accessory, uint256 accessoryId) external;
 }
