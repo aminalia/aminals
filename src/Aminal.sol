@@ -24,6 +24,8 @@ error MaxAminalsSpawned();
 // TODO: Add bulk purchase of food and movement
 // TODO: Add function that lets us modify metadata for unissued NFTs (and not
 // for issued ones)
+// TODO: Add personality (where there's a random chance of Aminals doing actions
+// different than or in addition to what is specified)
 contract Aminal is ERC721, IAminal {
     // Use SafeTransferLib from Solmate V7, which is identical to the
     // SafeTransferLib from Solmate V6 besides the MIT license
