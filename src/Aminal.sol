@@ -76,17 +76,23 @@ contract Aminal is ERC721, IAminal {
     int256 constant TIME_SINCE_START = 0;
 
     // TODO: Update these values to more thoughtful ones
-    // A spawn costs 0.01 ETH with a 10% price increase or decrease and an expected spawn rate of two per day
+    // A spawn costs 0.01 ETH with a 10% price increase or decrease and an
+    // expected spawn rate of two per day
+    // TODO: Consider switching spawns to a square root VRGDA
     int256 spawnTargetPrice = 0.01e18;
     int256 spawnPriceDecayPercent = 0.1e18;
     int256 spawnPerTimeUnit = 2e18;
 
-    // A feeding costs 0.001 ETH with a 5% price increase or decrease and an expected feed rate of 4 per hour, i.e. 4 * 24 = 96 over 24 hours
+    // A feeding costs 0.001 ETH with a 5% price increase or decrease and an
+    // expected feed rate of 4 per hour per aminaml, i.e. 4 * 24 = 96 over 24
+    // hours
     int256 feedTargetPrice = 0.001e18;
     int256 feedPriceDecayPercent = 0.05e18;
     int256 feedPerTimeUnit = 96e18;
 
-    // A goto costs 0.001 ETH with a 10% price increase or decrease and an expected goto rate of 4 per hour, i.e. 4 * 24 = 96 over 24 hours
+    // A goto costs 0.001 ETH with a 10% price increase or decrease and an
+    // expected goto rate of 4 per hour per aminal, i.e. 4 * 24 = 96 over 24
+    // hours
     int256 goToTargetPrice = 0.001e18;
     int256 goToPriceDecayPercent = 0.1e18;
     int256 goToPerTimeUnit = 96e18;
@@ -190,6 +196,10 @@ contract Aminal is ERC721, IAminal {
         emit AminalFed(msg.sender, aminalId, msg.value, senderAffinity, newMax);
     }
 
+    // TODO: Consider allowing anyone with affinity to trigger a movement. This
+    // allows people to compete using resource exhaustion strategies, where
+    // someone with a low affinity drievs up the price so a person with high
+    // affinity can't move it.
     function goTo(uint256 aminalId, uint160 location) public goingTo {
         if (!_exists(aminalId)) revert AminalDoesNotExist();
         if (affinity[aminalId][msg.sender] != maxAffinity[aminalId])
