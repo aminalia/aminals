@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.17;
 
 import "@core/interfaces/IAminalCoordinates.sol";
 import "@core/interfaces/IAminal.sol";
 
 contract AminalCoordinates is IAminalCoordinates {
     uint160 constant MAX_LOCATION = 1e18;
-    
+
     /* 
       1D location is mapped between 0 and 1e18
       
@@ -52,7 +52,11 @@ contract AminalCoordinates is IAminalCoordinates {
     function locationOf3D(address aminal, uint256 aminalId)
         public
         view
-        returns (uint160 x, uint160 y, uint160 z)
+        returns (
+            uint160 x,
+            uint160 y,
+            uint160 z
+        )
     {
         IAminal aminals = IAminal(aminal);
         if (!aminals.exists(aminalId)) revert AminalDoesNotExist();

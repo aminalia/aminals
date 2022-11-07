@@ -1,4 +1,4 @@
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.17;
 
 import "openzeppelin/token/ERC721/IERC721.sol";
 
