@@ -14,7 +14,7 @@ interface IAminal is IERC721 {
     event AminalSpawned(
         address spawner,
         uint256 aminalId,
-        uint256 value,
+        uint256 senderFed,
         uint256 affinity
     );
 

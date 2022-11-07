@@ -158,16 +158,9 @@ contract Aminal is ERC721, IAminal {
         if (excessPrice) {
             refundExcessPrice(price);
         }
-
-        emit AminalSpawned(
-            msg.sender,
-            currentAminalId,
-            msg.value,
-            senderAffinity
-        );
     }
 
-    function feed(uint256 aminalId) public payable {
+    function feed(uint256 aminalId, uint256 amount) public payable {
         checkVRGDAInitialized(aminalId, ActionTypes.FEED);
         uint256 price = spawnVRGDA.getVRGDAPrice(
             TIME_SINCE_START,
@@ -229,6 +222,8 @@ contract Aminal is ERC721, IAminal {
         aminal.spawnedBy = sender;
         aminal.fedPerAddress[sender] = amountFed;
         _mint(location, currentAminalId);
+
+        emit AminalSpawned(sender, currentAminalId, amountFed);
     }
 
     function updateAminalFedProperties(
