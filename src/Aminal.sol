@@ -45,36 +45,42 @@ contract Aminal is ERC721, IAminal {
         going = false;
     }
 
-    struct Aminal {
+    struct AminalStruct {
         address favorite;
         address coordinates;
         uint256 totalFed;
         uint256 totalGoTo;
         // We can calculate hunger based on lastFed.
         uint256 lastFed;
+        // We can have a fun multiplier like "lastExercised" if we wanted to for
+        // the gotos. That would require them to state the max movement they
+        // want to occur and be refunded for any unpurchased movements.
         uint256 lastGoTo;
-        uint256 timeSpawned;
         uint256 lastPooped;
+        // This data will not be updated after spawn
+        uint256 timeSpawned;
+        address spawnedBy;
         // We don't need to track the highest fed or goto amount because we can
         // get that by quering the mappings for the favorite address
         mapping(address => uint256) fedPerAddress;
         mapping(address => uint256) gotoPerAddress;
     }
 
-    mapping(uint256 => mapping(address => uint256)) public affinity;
-    mapping(uint256 => uint256) public maxAffinity;
+    // Mapping of Aminal IDs to Aminal structs
+    mapping(uint256 => AminalStruct) aminalProperties;
     // Spawning aminals has a global curve, while every other VRGDA is a local
     // curve. This is because we don't have per-aminal spawns. Breeding aminals,
     // for example, would have a local curve.
     AminalVRGDA spawnVRGDA;
-    // Set up a mapping of VRGDAs per aminal
-    // Each aminal has its own VRGDA curve, to represent its individual
-    // level of attention
+    // Set up a mapping of Aminal IDs to VRGDAs. This creates VRGDAs per aminal
+    // Each aminal has its own VRGDA curve, to represent its individual level of
+    // attention
     mapping(uint256 => AminalVRGDA) feedVRGDA;
     mapping(uint256 => AminalVRGDA) goToVRGDA;
 
     // TODO: Update this with the timestamp of deployment. This will save gas by
-    // maintaing it as a constant instead of setting it in the constructor.
+    // maintaing it as a constant instead of setting it in the constructor as a
+    // mutable variable.
     int256 constant TIME_SINCE_START = 0;
 
     // TODO: Update these values to more thoughtful ones
@@ -132,6 +138,9 @@ contract Aminal is ERC721, IAminal {
 
     function spawn() public payable {
         if (currentAminalId == MAX_AMINALS) revert MaxAminalsSpawned();
+        // Follows the Checks-Effects-Interactions pattern to prevent reentrancy attacks
+
+        // Checks
         // TODO: Refactor this to overload the checkVRGDAInitialized function to
         // only require an action for spawn (no aminalId needed)
         checkVRGDAInitialized(currentAminalId, ActionTypes.SPAWN);
@@ -141,23 +150,13 @@ contract Aminal is ERC721, IAminal {
         );
         bool excessPrice = checkExcessPrice(price);
 
+        // Effects
+        // Increment the current aminal ID and then spawn the aminal
         currentAminalId++;
-        uint256 senderAffinity = updateAffinity(
-            currentAminalId,
-            msg.sender,
-            msg.value
-        );
 
-        uint256 pseudorandomness = uint256(
-            keccak256(
-                abi.encodePacked(blockhash(block.number - 1), currentAminalId)
-            )
-        );
-        address location = address(
-            uint160(pseudorandomness % coordinates.maxLocation())
-        );
-        _mint(location, currentAminalId);
+        updateAminalSpawnedProperties(currentAminalId, msg.sender, msg.value);
 
+        // Interactions
         if (excessPrice) {
             refundExcessPrice(price);
         }
@@ -211,15 +210,40 @@ contract Aminal is ERC721, IAminal {
         _transfer(ownerOf(aminalId), address(location), aminalId);
     }
 
-    function updateAffinity(
+    function updateAminalSpawnedProperties(
         uint256 aminalId,
         address sender,
         uint256 value
-    ) internal returns (uint256 senderAffinity) {
-        // TODO how should affinity accumulate?
-        affinity[aminalId][sender] += value;
-        senderAffinity = affinity[aminalId][sender];
+    ) internal {
+        AminalStruct aminal = aminalProperties[aminalId];
+        uint256 pseudorandomness = getPseudorandomValue();
+
+        address location = address(
+            uint160(pseudorandomness % coordinates.maxLocation())
+        );
+
+        aminal.favorite = sender;
+        aminal.coordinates = location;
+        uint256 amountFed = value / feedTargetPrice;
+        aminal.totalFed = amountFed;
+        aminal.lastFed = block.timestamp;
+        aminal.timeSpawned = block.timestamp;
+        aminal.spawnedBy = sender;
+        aminal.fedPerAddress[sender] = amountFed;
+        _mint(location, currentAminalId);
     }
+
+    function updateAminalFedProperties(
+        uint256 aminalId,
+        address sender,
+        uint256 value
+    ) internal {}
+
+    function updateAminalGoToProperties(
+        uint256 aminalId,
+        address sender,
+        uint256 value
+    ) internal {}
 
     function checkVRGDAInitialized(uint256 aminalId, ActionTypes action)
         internal
@@ -289,6 +313,25 @@ contract Aminal is ERC721, IAminal {
 
     function refundExcessPrice(uint256 price) internal {
         SafeTransferLib.safeTransferETH(msg.sender, msg.value - price);
+    }
+
+    // This is neither cryptographically secure nor impossible to manipulate.
+    // The fact that Optimism has a single sequencer that processes transactions
+    // when they're received helps reduce the chance of manipulation here, but
+    // it doesn't eliminate it. Chainlink VRF adds quite a bit of overhead for
+    // our lower-security use case.
+    // TODO: Update this to be more robust, such as getting the balance of the
+    // USDC/ETH and OP/ETH Uniswap V3 pools
+    function getPseudorandomValue() internal view returns (uint256) {
+        return
+            uint256(
+                keccak256(
+                    abi.encodePacked(
+                        blockhash(block.number - 1),
+                        currentAminalId
+                    )
+                )
+            );
     }
 
     // Protect against someone mining the location key by disallowing any tranfser besides goto
