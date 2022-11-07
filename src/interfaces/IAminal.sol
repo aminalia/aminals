@@ -11,12 +11,7 @@ interface IAminal is IERC721 {
     error MaxAminalsSpawned();
     error OnlyEquipOwnedAccessory();
 
-    event AminalSpawned(
-        address spawner,
-        uint256 aminalId,
-        uint256 senderFed,
-        uint256 affinity
-    );
+    event AminalSpawned(address spawner, uint256 aminalId, uint256 senderFed);
 
     event AminalFed(
         address feeder,
