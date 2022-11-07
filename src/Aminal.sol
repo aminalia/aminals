@@ -13,7 +13,7 @@ error AminalDoesNotExist();
 error PriceTooLow();
 error SenderDoesNotHaveMaxAffinity();
 error ExceedsMaxLocation();
-error OnlyMoveWithGoTo();
+error OnlyMoveWithMove();
 error MaxAminalsSpawned();
 
 // TODO: Refactor Aminals to structs
@@ -49,13 +49,13 @@ contract Aminal is ERC721, IAminal {
         address favorite;
         address coordinates;
         uint256 totalFed;
-        uint256 totalGoTo;
+        uint256 totalMoved;
         // We can calculate hunger based on lastFed.
         uint256 lastFed;
         // We can have a fun multiplier like "lastExercised" if we wanted to for
         // the gotos. That would require them to state the max movement they
         // want to occur and be refunded for any unpurchased movements.
-        uint256 lastGoTo;
+        uint256 lastMoved;
         uint256 lastPooped;
         // This data will not be updated after spawn
         uint256 timeSpawned;
@@ -76,7 +76,7 @@ contract Aminal is ERC721, IAminal {
     // Each aminal has its own VRGDA curve, to represent its individual level of
     // attention
     mapping(uint256 => AminalVRGDA) feedVRGDA;
-    mapping(uint256 => AminalVRGDA) goToVRGDA;
+    mapping(uint256 => AminalVRGDA) moveVRGDA;
 
     // TODO: Update this with the timestamp of deployment. This will save gas by
     // maintaing it as a constant instead of setting it in the constructor as a
@@ -101,9 +101,9 @@ contract Aminal is ERC721, IAminal {
     // A goto costs 0.001 ETH with a 10% price increase or decrease and an
     // expected goto rate of 4 per hour per aminal, i.e. 4 * 24 = 96 over 24
     // hours
-    int256 goToTargetPrice = 0.001e18;
-    int256 goToPriceDecayPercent = 0.1e18;
-    int256 goToPerTimeUnit = 96e18;
+    int256 moveTargetPrice = 0.001e18;
+    int256 movePriceDecayPercent = 0.1e18;
+    int256 movePerTimeUnit = 96e18;
 
     enum ActionTypes {
         SPAWN,
@@ -201,7 +201,7 @@ contract Aminal is ERC721, IAminal {
     // allows people to compete using resource exhaustion strategies, where
     // someone with a low affinity drievs up the price so a person with high
     // affinity can't move it.
-    function goTo(uint256 aminalId, uint160 location) public goingTo {
+    function move(uint256 aminalId, uint160 location) public goingTo {
         if (!_exists(aminalId)) revert AminalDoesNotExist();
         if (affinity[aminalId][msg.sender] != maxAffinity[aminalId])
             revert SenderDoesNotHaveMaxAffinity();
@@ -239,7 +239,7 @@ contract Aminal is ERC721, IAminal {
         uint256 value
     ) internal {}
 
-    function updateAminalGoToProperties(
+    function updateAminalMoveProperties(
         uint256 aminalId,
         address sender,
         uint256 value
@@ -277,9 +277,9 @@ contract Aminal is ERC721, IAminal {
             );
         } else if (action == ActionTypes.GO_TO) {
             vrgda = new AminalVRGDA(
-                goToTargetPrice,
-                goToPriceDecayPercent,
-                goToPerTimeUnit
+                moveTargetPrice,
+                movePriceDecayPercent,
+                movePerTimeUnit
             );
         }
     }
@@ -291,7 +291,7 @@ contract Aminal is ERC721, IAminal {
         if (action == ActionTypes.FEED) {
             return feedVRGDA[aminalId];
         } else if (action == ActionTypes.GO_TO) {
-            return goToVRGDA[aminalId];
+            return moveVRGDA[aminalId];
         }
     }
 
@@ -341,6 +341,6 @@ contract Aminal is ERC721, IAminal {
         address,
         uint256
     ) internal view {
-        if (!going) revert OnlyMoveWithGoTo();
+        if (!going) revert OnlyMoveWithMove();
     }
 }
