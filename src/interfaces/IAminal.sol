@@ -1,4 +1,5 @@
-pragma solidity ^0.8.16;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
 
 import "openzeppelin/token/ERC721/IERC721.sol";
 
@@ -10,12 +11,7 @@ interface IAminal is IERC721 {
     error MaxAminalsSpawned();
     error OnlyEquipOwnedAccessory();
 
-    event AminalSpawned(
-        address spawner,
-        uint256 aminalId,
-        uint256 value,
-        uint256 affinity
-    );
+    event AminalSpawned(address spawner, uint256 aminalId, uint256 senderFed);
 
     event AminalFed(
         address feeder,

@@ -1,4 +1,5 @@
-pragma solidity ^0.8.16;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
 
 interface IAminalCoordinates {
     error AminalDoesNotExist();
