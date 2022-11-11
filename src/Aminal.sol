@@ -16,16 +16,15 @@ error ExceedsMaxLocation();
 error OnlyMoveWithMove();
 error MaxAminalsSpawned();
 
-// TODO: Refactor Aminals to structs
+// TODO: Update IAminal interfaces
 // TODO: Add getters for prices for each action
 // TODO: Add hunger. Hunger acts as a multiplier on top of the units of food
 // that someone bought
-// TODO: Add poop
-// TODO: Add bulk purchase of food and movement
+// TODO: Add random seed value that is generated upon each action
 // TODO: Add function that lets us modify metadata for unissued NFTs (and not
 // for issued ones)
 // TODO: Add metatransaction support to allow for wrapper contracts
-contract Aminal is ERC721, IAminal {
+contract Aminal is ERC721 {
     // Use SafeTransferLib from Solmate V7, which is identical to the
     // SafeTransferLib from Solmate V6 besides the MIT license
     uint160 constant MAX_LOCATION = 1e9;
@@ -63,7 +62,7 @@ contract Aminal is ERC721, IAminal {
         // We don't need to track the highest fed or goto amount because we can
         // get that by quering the mappings for the favorite address
         mapping(address => uint256) fedPerAddress;
-        mapping(address => uint256) gotoPerAddress;
+        mapping(address => uint256) movedPerAddress;
     }
 
     // Mapping of Aminal IDs to Aminal structs
@@ -108,7 +107,7 @@ contract Aminal is ERC721, IAminal {
     enum ActionTypes {
         SPAWN,
         FEED,
-        GO_TO
+        MOVE
     }
 
     constructor(address _coordinatesMap) ERC721("Aminal", "AMNL") {
@@ -164,13 +163,17 @@ contract Aminal is ERC721, IAminal {
 
     function feed(uint256 aminalId, uint256 amount) public payable {
         checkVRGDAInitialized(aminalId, ActionTypes.FEED);
+
+        // Reference storage because AminalStruct contains a nested mapping,
+        // requires using storage
+        AminalStruct storage aminal = aminalProperties[aminalId];
         uint256 startingPrice = feedVRGDA[aminalId].getVRGDAPrice(
-            aminalId.spawnTime,
-            aminalId.totalFed
+            int256(aminal.spawnTime),
+            aminal.totalFed
         );
         uint256 endingPrice = feedVRGDA[aminalId].getVRGDAPrice(
-            aminalId.spawnTime,
-            aminalId.totalFed + amount
+            int256(aminal.spawnTime),
+            aminal.totalFed + amount
         );
 
         // If there are any edge cases where ending price is less than starting
@@ -189,7 +192,8 @@ contract Aminal is ERC721, IAminal {
             refundExcessPrice(price);
         }
 
-        emit AminalFed(msg.sender, aminalId, msg.value, senderAffinity, newMax);
+        // TODO: Finish event
+        // emit AminalFed(msg.sender, aminalId, msg.value);
     }
 
     // TODO: Consider allowing anyone with affinity to trigger a movement. This
@@ -197,12 +201,35 @@ contract Aminal is ERC721, IAminal {
     // someone with a low affinity drievs up the price so a person with high
     // affinity can't move it.
     function move(uint256 aminalId, uint160 location) public goingTo {
-        if (!_exists(aminalId)) revert AminalDoesNotExist();
-        if (affinity[aminalId][msg.sender] != maxAffinity[aminalId])
-            revert SenderDoesNotHaveMaxAffinity();
-        if (location > coordinates.maxLocation()) revert ExceedsMaxLocation();
+        checkVRGDAInitialized(aminalId, ActionTypes.MOVE);
 
-        _transfer(ownerOf(aminalId), address(location), aminalId);
+        AminalStruct storage aminal = aminalProperties[aminalId];
+
+        // TODO: Calculate distance. Using location as a placeholder here
+        uint256 amount = location;
+        // TODO: Based on distance, allow them to move via affinity. Maybe
+        // affinity is a multiplier?
+
+        uint256 startingPrice = moveVRGDA[aminalId].getVRGDAPrice(
+            int256(aminal.spawnTime),
+            aminal.totalMoved
+        );
+        uint256 endingPrice = moveVRGDA[aminalId].getVRGDAPrice(
+            int256(aminal.spawnTime),
+            aminal.totalMoved + amount
+        );
+
+        uint256 price = (endingPrice - startingPrice) / amount;
+
+        updateAminalMoveProperties(aminalId, msg.sender, amount);
+
+        bool excessPrice = checkExcessPrice(price);
+
+        if (excessPrice) {
+            refundExcessPrice(price);
+        }
+
+        // TODO: Emit AminalSpawned events
     }
 
     function updateAminalSpawnedProperties(
@@ -210,7 +237,7 @@ contract Aminal is ERC721, IAminal {
         address sender,
         uint256 value
     ) internal {
-        AminalStruct aminal = aminalProperties[aminalId];
+        AminalStruct storage aminal = aminalProperties[aminalId];
         uint256 pseudorandomness = getPseudorandomValue();
 
         address location = address(
@@ -219,7 +246,7 @@ contract Aminal is ERC721, IAminal {
 
         aminal.favorite = sender;
         aminal.coordinates = location;
-        uint256 amountFed = value / feedTargetPrice;
+        uint256 amountFed = uint256(int256(value) / feedTargetPrice);
         aminal.totalFed = amountFed;
         aminal.lastFed = block.timestamp;
         aminal.spawnTime = block.timestamp;
@@ -227,7 +254,8 @@ contract Aminal is ERC721, IAminal {
         aminal.fedPerAddress[sender] = amountFed;
         _mint(location, currentAminalId);
 
-        emit AminalSpawned(sender, currentAminalId, amountFed);
+        // TODO: Finish event
+        // emit AminalSpawned(sender, currentAminalId, amountFed);
     }
 
     function updateAminalFedProperties(
@@ -235,8 +263,8 @@ contract Aminal is ERC721, IAminal {
         address sender,
         uint256 value
     ) internal {
-        AminalStruct aminal = aminalProperties[aminalId];
-        aminal.totalFed = value;
+        AminalStruct storage aminal = aminalProperties[aminalId];
+        aminal.totalFed += value;
         aminal.lastFed = block.timestamp;
         aminal.fedPerAddress[sender] = value;
 
@@ -256,7 +284,14 @@ contract Aminal is ERC721, IAminal {
         uint256 aminalId,
         address sender,
         uint256 value
-    ) internal {}
+    ) internal {
+        AminalStruct storage aminal = aminalProperties[aminalId];
+        aminal.totalMoved += value;
+        aminal.lastMoved = block.timestamp;
+        aminal.movedPerAddress[sender] = value;
+
+        // TODO: Emit event
+    }
 
     function checkVRGDAInitialized(uint256 aminalId, ActionTypes action)
         internal
@@ -288,7 +323,7 @@ contract Aminal is ERC721, IAminal {
                 feedPriceDecayPercent,
                 feedPerTimeUnit
             );
-        } else if (action == ActionTypes.GO_TO) {
+        } else if (action == ActionTypes.MOVE) {
             vrgda = new AminalVRGDA(
                 moveTargetPrice,
                 movePriceDecayPercent,
@@ -303,7 +338,7 @@ contract Aminal is ERC721, IAminal {
     {
         if (action == ActionTypes.FEED) {
             return feedVRGDA[aminalId];
-        } else if (action == ActionTypes.GO_TO) {
+        } else if (action == ActionTypes.MOVE) {
             return moveVRGDA[aminalId];
         }
     }
