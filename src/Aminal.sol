@@ -24,6 +24,7 @@ error MaxAminalsSpawned();
 // TODO: Add bulk purchase of food and movement
 // TODO: Add function that lets us modify metadata for unissued NFTs (and not
 // for issued ones)
+// TODO: Add metatransaction support to allow for wrapper contracts
 contract Aminal is ERC721, IAminal {
     // Use SafeTransferLib from Solmate V7, which is identical to the
     // SafeTransferLib from Solmate V6 besides the MIT license
@@ -56,8 +57,9 @@ contract Aminal is ERC721, IAminal {
         uint256 lastMoved;
         uint256 lastPooped;
         // This data will not be updated after spawn
-        uint256 timeSpawned;
+        uint256 spawnTime;
         address spawnedBy;
+        address spawnedAt;
         // We don't need to track the highest fed or goto amount because we can
         // get that by quering the mappings for the favorite address
         mapping(address => uint256) fedPerAddress;
@@ -162,24 +164,26 @@ contract Aminal is ERC721, IAminal {
 
     function feed(uint256 aminalId, uint256 amount) public payable {
         checkVRGDAInitialized(aminalId, ActionTypes.FEED);
-        uint256 price = spawnVRGDA.getVRGDAPrice(
-            TIME_SINCE_START,
-            // TODO: Refactor this to use the total food (requires the struct refactor)
-            currentAminalId
+        uint256 startingPrice = feedVRGDA[aminalId].getVRGDAPrice(
+            aminalId.spawnTime,
+            aminalId.totalFed
         );
+        uint256 endingPrice = feedVRGDA[aminalId].getVRGDAPrice(
+            aminalId.spawnTime,
+            aminalId.totalFed + amount
+        );
+
+        // If there are any edge cases where ending price is less than starting
+        // price, this will revert because the subtraction is checked. Those
+        // cases are rather unlikely though.
+        uint256 price = (endingPrice - startingPrice) / amount;
+
+        // TODO: Calculate hunger here and scale amount by hunger
+        uint256 amountWithHunger = amount;
+
+        updateAminalFedProperties(aminalId, msg.sender, amountWithHunger);
+
         bool excessPrice = checkExcessPrice(price);
-
-        uint256 senderAffinity = updateAffinity(
-            aminalId,
-            msg.sender,
-            msg.value
-        );
-
-        bool newMax;
-        if (senderAffinity > maxAffinity[aminalId]) {
-            maxAffinity[aminalId] = senderAffinity;
-            newMax = true;
-        }
 
         if (excessPrice) {
             refundExcessPrice(price);
@@ -218,7 +222,7 @@ contract Aminal is ERC721, IAminal {
         uint256 amountFed = value / feedTargetPrice;
         aminal.totalFed = amountFed;
         aminal.lastFed = block.timestamp;
-        aminal.timeSpawned = block.timestamp;
+        aminal.spawnTime = block.timestamp;
         aminal.spawnedBy = sender;
         aminal.fedPerAddress[sender] = amountFed;
         _mint(location, currentAminalId);
@@ -230,7 +234,23 @@ contract Aminal is ERC721, IAminal {
         uint256 aminalId,
         address sender,
         uint256 value
-    ) internal {}
+    ) internal {
+        AminalStruct aminal = aminalProperties[aminalId];
+        aminal.totalFed = value;
+        aminal.lastFed = block.timestamp;
+        aminal.fedPerAddress[sender] = value;
+
+        // If the sender has fed the same amount as the favorite, set the sender
+        // as the favorite because the sender is more recent
+        if (
+            aminal.fedPerAddress[sender] >=
+            aminal.fedPerAddress[aminal.favorite]
+        ) {
+            aminal.favorite = sender;
+            // TODO: Emit FavoriteUpdated event
+        }
+        // TODO: Emit event
+    }
 
     function updateAminalMoveProperties(
         uint256 aminalId,
